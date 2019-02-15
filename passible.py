@@ -35,17 +35,21 @@ def execute_ansible_cmd(ansible_cmd):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--inventory", help="For Ansible inventory file location.", dest="inventory")
-    parser.add_argument("-vp", "--vaultpwd", help="Ask for Ansible Vault password.", action="store_true", dest="vaultpwd")
-    parser.add_argument("-gn", "--groupname", help="Ansible Group Name", dest="groupname")
+    parser.add_argument("-i", "--inventory", help="For custom Ansible inventory file location.", dest="inventory")
+    parser.add_argument("-vp", "--vaultpwd", help="To enable asking for Ansible vault password.", action="store_true", dest="vaultpwd")
+    parser.add_argument("-b", "--become", help="To enable using become (sudo) method for privilege escalation.", action="store_true", dest="become")
+    parser.add_argument("-gn", "--groupname", help="Set Ansible hostgroup name for changing passwords. This argument is mandatory.", dest="groupname")
     args = parser.parse_args()
     inv_file_location = ' '
     ask_vault_pass = ' '
+    become = ' '
     if args.inventory:
         inv_file_location = ' -i ' + args.inventory + ' '
     if args.vaultpwd:
         ask_vault_pass = ' --ask-vault-pass '
         vault_pass = getpass.getpass('Enter Vault Pass: ')
+    if args.become:
+        become = ' --become '
     if args.groupname:
         host_group_name = args.groupname
         server_list = []
@@ -61,13 +65,13 @@ if __name__ == '__main__':
             for server in server_list:
                 server_short = server.split('.')[0]
                 passwd = generate_password()
-                cmd = "/usr/bin/ansible" + inv_file_location + server + ask_vault_pass + "-m setup -a 'filter=ansible_default_ipv4'"
+                cmd = "/usr/bin/ansible" + inv_file_location + server + become + ask_vault_pass + "-m setup -a 'filter=ansible_default_ipv4'"
                 proc_out = execute_ansible_cmd(cmd)
                 regex = re.compile(r'(.*\|\s(CHANGED|SUCCESS))\s=>.+ansible_default_ipv4.+\"address\":\s\"(\d+\.\d+\.\d+\.\d+)\",.+\"type\":\s\"(ether|bonding|bridge)\"', re.IGNORECASE | re.DOTALL)
                 match = regex.match(proc_out)
                 if match:
                     server_ip_addr = regex.search(proc_out).group(2).strip()
-                cmd = "/usr/bin/ansible" + inv_file_location + server + ask_vault_pass + "-m user -a 'name=root password=" + sha512_crypt.encrypt(passwd) + "'"
+                cmd = "/usr/bin/ansible" + inv_file_location + server + become + ask_vault_pass + "-m user -a 'name=root password=" + sha512_crypt.encrypt(passwd) + "'"
                 proc_out = execute_ansible_cmd(cmd)
                 print proc_out
                 regex = re.compile(r'(.*\|\s(CHANGED|SUCCESS))\s=>.+\"changed\":\strue,', re.IGNORECASE | re.DOTALL)
