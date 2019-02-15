@@ -9,6 +9,7 @@ import re
 import pexpect
 import argparse
 import getpass
+import gnupg
 
 __location__ = os.path.dirname(os.path.abspath(__file__))
 
@@ -34,6 +35,8 @@ def execute_ansible_cmd(ansible_cmd):
 
 
 if __name__ == '__main__':
+    gpg = gnupg.GPG()
+    gpg.encoding = 'utf-8'
     parser = argparse.ArgumentParser()
     parser.add_argument("-i", "--inventory", help="For custom Ansible inventory file location.", dest="inventory")
     parser.add_argument("-vp", "--vaultpwd", help="To enable asking for Ansible vault password.", action="store_true", dest="vaultpwd")
@@ -52,6 +55,7 @@ if __name__ == '__main__':
         become = ' --become '
     if args.groupname:
         host_group_name = args.groupname
+        gpg_pass = getpass.getpass('Enter a GPG Passphrase to encrypt passible\'s output: ')
         server_list = []
         cmd = "/usr/bin/ansible" + inv_file_location + host_group_name + ask_vault_pass + "--list-hosts"
         proc_out = execute_ansible_cmd(cmd)
@@ -60,7 +64,7 @@ if __name__ == '__main__':
         del server_list[0]
 
         try:
-            pw_file = open(os.path.join(__location__, 'passible_' + host_group_name), 'w')
+            pw_file = open(os.path.join(__location__, 'passible_' + host_group_name + '.gpg'), 'w')
             passible_out = ''
             for server in server_list:
                 server_short = server.split('.')[0]
@@ -78,7 +82,8 @@ if __name__ == '__main__':
                 match = regex.match(proc_out)
                 if match:
                     passible_out = passible_out + host_group_name + ' ' + server + ' ' + server_ip_addr + ' ' + passwd + '\n'
-            pw_file.write(passible_out)
+            encrypted = str(gpg.encrypt(passible_out, recipients=None, symmetric=True, passphrase=gpg_pass))
+            pw_file.write(encrypted)
         finally:
             pw_file.close()
     else:
