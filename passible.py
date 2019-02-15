@@ -38,10 +38,10 @@ if __name__ == '__main__':
     gpg = gnupg.GPG()
     gpg.encoding = 'utf-8'
     parser = argparse.ArgumentParser()
-    parser.add_argument("-i", "--inventory", help="For custom Ansible inventory file location.", dest="inventory")
-    parser.add_argument("-vp", "--vaultpwd", help="To enable asking for Ansible vault password.", action="store_true", dest="vaultpwd")
-    parser.add_argument("-b", "--become", help="To enable using become (sudo) method for privilege escalation.", action="store_true", dest="become")
-    parser.add_argument("-gn", "--groupname", help="Set Ansible hostgroup name for changing passwords. This argument is mandatory.", dest="groupname")
+    parser.add_argument("-gn", "--groupname", help="Hostgroup name.")
+    parser.add_argument("-i", "--inventory", help="Custom inventory file.")
+    parser.add_argument("-vp", "--vaultpwd", help="Enable asking for vault password.", action="store_true")
+    parser.add_argument("-b", "--become", help="Enable privilege escalation.", action="store_true")
     args = parser.parse_args()
     inv_file_location = ' '
     ask_vault_pass = ' '
@@ -94,4 +94,4 @@ if __name__ == '__main__':
         group_list = regex.search(proc_out).group(1)
         for line in group_list.split('\n'):
             print line.strip().replace("\"", "").replace(",", "")
-
+        parser.print_help()
