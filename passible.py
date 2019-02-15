@@ -50,7 +50,6 @@ if __name__ == '__main__':
         host_group_name = args.groupname
         server_list = []
         cmd = "/usr/bin/ansible" + inv_file_location + host_group_name + ask_vault_pass + "--list-hosts"
-        print cmd
         proc_out = execute_ansible_cmd(cmd)
         for line in proc_out.split('\n'):
             server_list.append(line.strip())
@@ -63,14 +62,12 @@ if __name__ == '__main__':
                 server_short = server.split('.')[0]
                 passwd = generate_password()
                 cmd = "/usr/bin/ansible" + inv_file_location + server + ask_vault_pass + "-m setup -a 'filter=ansible_default_ipv4'"
-                print cmd
                 proc_out = execute_ansible_cmd(cmd)
                 regex = re.compile(r'(.*\|\s(CHANGED|SUCCESS))\s=>.+ansible_default_ipv4.+\"address\":\s\"(\d+\.\d+\.\d+\.\d+)\",.+\"type\":\s\"(ether|bonding|bridge)\"', re.IGNORECASE | re.DOTALL)
                 match = regex.match(proc_out)
                 if match:
                     server_ip_addr = regex.search(proc_out).group(2).strip()
                 cmd = "/usr/bin/ansible" + inv_file_location + server + ask_vault_pass + "-m user -a 'name=root password=" + sha512_crypt.encrypt(passwd) + "'"
-                print cmd
                 proc_out = execute_ansible_cmd(cmd)
                 print proc_out
                 regex = re.compile(r'(.*\|\s(CHANGED|SUCCESS))\s=>.+\"changed\":\strue,', re.IGNORECASE | re.DOTALL)
@@ -83,7 +80,6 @@ if __name__ == '__main__':
     else:
         print "An Ansible host group should be specified as a parameter! A group name you may choose:"
         cmd = "/usr/bin/ansible" + inv_file_location + "localhost" + ask_vault_pass  + "-m debug -a 'var=groups.keys()'"
-        print cmd
         proc_out = execute_ansible_cmd(cmd)
         regex = re.compile(r'.*\"groups.keys\(\)\":\s\[(.*)\]', re.DOTALL)
         group_list = regex.search(proc_out).group(1)
