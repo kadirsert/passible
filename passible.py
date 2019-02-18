@@ -40,6 +40,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("-gn", "--groupname", help="Hostgroup name.")
     parser.add_argument("-i", "--inventory", help="Custom inventory file.")
+    parser.add_argument("-ru", "--remoteuser", help="Remote username whose password will be changed.", default="root")
     parser.add_argument("-vp", "--vaultpwd", help="Enable asking for vault password.", action="store_true")
     parser.add_argument("-b", "--become", help="Enable privilege escalation.", action="store_true")
     args = parser.parse_args()
@@ -75,13 +76,13 @@ if __name__ == '__main__':
                 match = regex.match(proc_out)
                 if match:
                     server_ip_addr = regex.search(proc_out).group(2).strip()
-                cmd = "/usr/bin/ansible" + inv_file_location + server + become + ask_vault_pass + "-m user -a 'name=root password=" + sha512_crypt.encrypt(passwd) + "'"
+                cmd = "/usr/bin/ansible" + inv_file_location + server + become + ask_vault_pass + "-m user -a 'name=" + args.remoteuser + " password=" + sha512_crypt.encrypt(passwd) + "'"
                 proc_out = execute_ansible_cmd(cmd)
                 print proc_out
                 regex = re.compile(r'(.*\|\s(CHANGED|SUCCESS))\s=>.+\"changed\":\strue,', re.IGNORECASE | re.DOTALL)
                 match = regex.match(proc_out)
                 if match:
-                    passible_out = passible_out + host_group_name + ' ' + server + ' ' + server_ip_addr + ' ' + passwd + '\n'
+                    passible_out = passible_out + host_group_name + ' ' + server + ' ' + server_ip_addr + ' ' + args.remoteuser + ' '  + passwd + '\n'
             encrypted = str(gpg.encrypt(passible_out, recipients=None, symmetric=True, passphrase=gpg_pass))
             pw_file.write(encrypted)
         finally:
