@@ -1,10 +1,11 @@
 #!/usr/bin/env python
+# -*- coding: utf-8 -*-
 
 from passlib.hash import sha512_crypt
+from os.path import expanduser
 import string
 import random
 import os
-import sys
 import re
 import pexpect
 import argparse
@@ -20,13 +21,14 @@ def generate_password():
     str_digit = ''.join(random.choice(string.digits) for _ in range(2))
     str_special = ''.join(random.choice('+*-') for _ in range(1))
     strc = str_lower + str_upper + str_digit + str_special
-    return ''.join(random.sample(strc,len(strc)))
+    return ''.join(random.sample(strc, len(strc)))
+
 
 def execute_ansible_cmd(ansible_cmd):
     child = pexpect.spawn(ansible_cmd)
     child.setecho(False)
     if args.vaultpwd:
-        child.expect ("Vault password:")
+        child.expect("Vault password:")
         child.sendline(vault_pass)
     child.expect(pexpect.EOF)
     expect_out = child.before.strip()
@@ -37,12 +39,15 @@ def execute_ansible_cmd(ansible_cmd):
 if __name__ == '__main__':
     gpg = gnupg.GPG()
     gpg.encoding = 'utf-8'
+    output_directory = expanduser("~")
     parser = argparse.ArgumentParser()
     parser.add_argument("-gn", "--groupname", help="Hostgroup name.")
     parser.add_argument("-i", "--inventory", help="Custom inventory file.")
     parser.add_argument("-ru", "--remoteuser", help="Remote username whose password will be changed.", default="root")
     parser.add_argument("-vp", "--vaultpwd", help="Enable asking for vault password.", action="store_true")
     parser.add_argument("-b", "--become", help="Enable privilege escalation.", action="store_true")
+    parser.add_argument("-o", "--outputdir", help="Directory for the GPG encrypted password output.",
+                        default=output_directory)
     args = parser.parse_args()
     inv_file_location = ' '
     ask_vault_pass = ' '
@@ -65,31 +70,35 @@ if __name__ == '__main__':
         del server_list[0]
 
         try:
-            pw_file = open(os.path.join(__location__, 'passible_' + host_group_name + '.gpg'), 'w')
+            server_ip_addr = ''
             passible_out = ''
             for server in server_list:
                 server_short = server.split('.')[0]
                 passwd = generate_password()
                 cmd = "/usr/bin/ansible" + inv_file_location + server + become + ask_vault_pass + "-m setup -a 'filter=ansible_default_ipv4'"
                 proc_out = execute_ansible_cmd(cmd)
-                regex = re.compile(r'(.*\|\s(CHANGED|SUCCESS))\s=>.+ansible_default_ipv4.+\"address\":\s\"(\d+\.\d+\.\d+\.\d+)\",.+\"type\":\s\"(ether|bonding|bridge)\"', re.IGNORECASE | re.DOTALL)
+                regex = re.compile(
+                    r'(.*\|\s(CHANGED|SUCCESS))\s=>.+ansible_default_ipv4.+\"address\":\s\"(\d+\.\d+\.\d+\.\d+)\",.+\"type\":\s\"(ether|bonding|bridge)\"',
+                    re.IGNORECASE | re.DOTALL)
                 match = regex.match(proc_out)
                 if match:
                     server_ip_addr = regex.search(proc_out).group(2).strip()
-                cmd = "/usr/bin/ansible" + inv_file_location + server + become + ask_vault_pass + "-m user -a 'name=" + args.remoteuser + " password=" + sha512_crypt.encrypt(passwd) + "'"
+                cmd = "/usr/bin/ansible" + inv_file_location + server + become + ask_vault_pass + "-m user -a 'name=" + args.remoteuser + " password=" + sha512_crypt.encrypt(
+                    passwd) + "'"
                 proc_out = execute_ansible_cmd(cmd)
                 print proc_out
                 regex = re.compile(r'(.*\|\s(CHANGED|SUCCESS))\s=>.+\"changed\":\strue,', re.IGNORECASE | re.DOTALL)
                 match = regex.match(proc_out)
                 if match:
-                    passible_out = passible_out + host_group_name + ' ' + server + ' ' + server_ip_addr + ' ' + args.remoteuser + ' '  + passwd + '\n'
+                    passible_out = passible_out + host_group_name + ' ' + server + ' ' + server_ip_addr + ' ' + args.remoteuser + ' ' + passwd + '\n'
             encrypted = str(gpg.encrypt(passible_out, recipients=None, symmetric=True, passphrase=gpg_pass))
-            pw_file.write(encrypted)
-        finally:
-            pw_file.close()
+            with open(os.path.join(args.outputdir, 'passible_' + host_group_name + '.gpg'), 'w') as pw_file:
+                pw_file.write(encrypted)
+        except IOError:
+            print "IOError!!!"
     else:
         print "An Ansible host group should be specified as a parameter! A group name you may choose:"
-        cmd = "/usr/bin/ansible" + inv_file_location + "localhost" + ask_vault_pass  + "-m debug -a 'var=groups.keys()'"
+        cmd = "/usr/bin/ansible" + inv_file_location + "localhost" + ask_vault_pass + "-m debug -a 'var=groups.keys()'"
         proc_out = execute_ansible_cmd(cmd)
         regex = re.compile(r'.*\"groups.keys\(\)\":\s\[(.*)\]', re.DOTALL)
         group_list = regex.search(proc_out).group(1)
