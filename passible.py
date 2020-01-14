@@ -94,7 +94,7 @@ if __name__ == '__main__':
                         re.IGNORECASE | re.DOTALL)
                     match = regex.match(proc_out)
                     if match:
-                        server_ip_addr = regex.search(proc_out).group(2).strip()
+                        server_ip_addr = regex.search(proc_out).group(3).strip()
                     cmd = "/usr/bin/ansible" + inv_file_location + server + become + ask_vault_pass + "-m user -a 'name=" + args.remoteuser + " password=" + sha512_crypt.encrypt(
                         passwd) + "'"
                     proc_out = execute_ansible_cmd(cmd)
