@@ -31,7 +31,7 @@ def execute_ansible_cmd(ansible_cmd):
         child.expect("Vault password:")
         child.sendline(vault_pass)
     child.expect(pexpect.EOF)
-    expect_out = child.before.strip()
+    expect_out = child.before.strip().decode('utf-8')
     child.close()
     return expect_out
 
@@ -57,10 +57,10 @@ if __name__ == '__main__':
         test_str = raw_input("Enter an example string: ")
         gpg_test_pass = getpass.getpass('Enter a GPG Passphrase to test if encryption is working: ')
         try:
-            encrypted = str(gpg.encrypt(test_str + '\n', recipients=None, symmetric=True, passphrase=gpg_test_pass))
+            encrypted = str(gpg.encrypt(test_str + '\n', symmetric=True, passphrase=gpg_test_pass, encrypt=False))
             with open(os.path.join(args.outputdir, 'passible_test.gpg'), 'w') as test_file:
                 test_file.write(encrypted)
-            print "Output is written to " + test_file.name + " , you can decrypt it using command: gpg -d " + test_file.name
+            print("Output is written to " + test_file.name + " , you can decrypt it using command: gpg -d " + test_file.name)
         except Exception as error:
             print(error)
     else:
@@ -77,6 +77,7 @@ if __name__ == '__main__':
             server_list = []
             cmd = "/usr/bin/ansible" + inv_file_location + host_group_name + ask_vault_pass + "--list-hosts"
             proc_out = execute_ansible_cmd(cmd)
+            print(proc_out)
             for line in proc_out.split('\n'):
                 server_list.append(line.strip())
             del server_list[0]
@@ -95,26 +96,25 @@ if __name__ == '__main__':
                     match = regex.match(proc_out)
                     if match:
                         server_ip_addr = regex.search(proc_out).group(3).strip()
-                    cmd = "/usr/bin/ansible" + inv_file_location + server + become + ask_vault_pass + "-m user -a 'name=" + args.remoteuser + " password=" + sha512_crypt.encrypt(
+                    cmd = "/usr/bin/ansible" + inv_file_location + server + become + ask_vault_pass + "-m user -a 'name=" + args.remoteuser + " password=" + sha512_crypt.hash(
                         passwd) + "'"
                     proc_out = execute_ansible_cmd(cmd)
-                    print proc_out
                     regex = re.compile(r'(.*\|\s(CHANGED|SUCCESS))\s=>.+\"changed\":\strue,', re.IGNORECASE | re.DOTALL)
                     match = regex.match(proc_out)
                     if match:
                         passible_out = passible_out + host_group_name + ' ' + server + ' ' + server_ip_addr + ' ' + args.remoteuser + ' ' + passwd + '\n'
-                encrypted = str(gpg.encrypt(passible_out, recipients=None, symmetric=True, passphrase=gpg_pass))
+                encrypted = str(gpg.encrypt(passible_out, symmetric=True, passphrase=gpg_pass, encrypt=False))
                 with open(os.path.join(args.outputdir, 'passible_' + host_group_name + '.gpg'), 'w') as pw_file:
                     pw_file.write(encrypted)
-                print "Output is written to " + pw_file.name + " , you can decrypt it using command: gpg -d " + pw_file.name
+                print("Output is written to " + pw_file.name + " , you can decrypt it using command: gpg -d " + pw_file.name)
             except Exception as error:
                 print(error)
         else:
-            print "An Ansible host group should be specified as a parameter! A group name you may choose:"
+            print("An Ansible host group should be specified as a parameter! A group name you may choose:")
             cmd = "/usr/bin/ansible" + inv_file_location + "localhost" + ask_vault_pass + "-m debug -a 'var=groups.keys()'"
             proc_out = execute_ansible_cmd(cmd)
             regex = re.compile(r'.*\"groups.keys\(\)\":\s\[(.*)\]', re.DOTALL)
             group_list = regex.search(proc_out).group(1)
             for line in group_list.split('\n'):
-                print line.strip().replace("\"", "").replace(",", "")
+                print(line.strip().replace("\"", "").replace(",", ""))
             parser.print_help()
